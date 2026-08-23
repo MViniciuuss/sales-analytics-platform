@@ -1,30 +1,63 @@
-from pathlib import Path
+from sqlalchemy import text
 
-import pandas as pd
-
-
-BASE_DIR = Path(__file__).resolve().parents[3]
-
-SALES_DATA_PATH = (
-    BASE_DIR
-    / "data"
-    / "processed"
-    / "sales_analytics.csv"
-)
+from backend.app.database import engine
 
 
 def get_dashboard_summary():
-    """Calcula os principais KPIs da plataforma."""
+    """Calcula os principais KPIs diretamente no PostgreSQL."""
 
-    sales = pd.read_csv(SALES_DATA_PATH)
+    query = text(
+        """
+        SELECT
+            ROUND(
+                SUM(
+                    oi.quantity
+                    * oi.unit_price
+                    * (1 - oi.discount_pct)
+                ),
+                2
+            ) AS total_revenue,
 
-    total_revenue = sales["net_revenue"].sum()
-    total_profit = sales["profit"].sum()
+            ROUND(
+                SUM(
+                    (
+                        oi.quantity
+                        * oi.unit_price
+                        * (1 - oi.discount_pct)
+                    )
+                    -
+                    (
+                        oi.quantity
+                        * p.unit_cost
+                    )
+                ),
+                2
+            ) AS total_profit,
 
-    total_orders = sales["order_id"].nunique()
-    total_customers = sales["customer_id"].nunique()
+            COUNT(DISTINCT o.order_id) AS total_orders,
 
-    total_items = sales["quantity"].sum()
+            COUNT(DISTINCT o.customer_id) AS total_customers,
+
+            SUM(oi.quantity) AS total_items
+
+        FROM order_items oi
+
+        JOIN orders o
+            ON oi.order_id = o.order_id
+
+        JOIN products p
+            ON oi.product_id = p.product_id
+        """
+    )
+
+    with engine.connect() as connection:
+        result = connection.execute(query).mappings().one()
+
+    total_revenue = float(result["total_revenue"] or 0)
+    total_profit = float(result["total_profit"] or 0)
+    total_orders = int(result["total_orders"] or 0)
+    total_customers = int(result["total_customers"] or 0)
+    total_items = int(result["total_items"] or 0)
 
     average_ticket = (
         total_revenue / total_orders
@@ -39,11 +72,12 @@ def get_dashboard_summary():
     )
 
     return {
-        "total_revenue": round(float(total_revenue), 2),
-        "total_profit": round(float(total_profit), 2),
-        "profit_margin": round(float(profit_margin), 2),
-        "total_orders": int(total_orders),
-        "total_customers": int(total_customers),
-        "total_items": int(total_items),
-        "average_ticket": round(float(average_ticket), 2),
+        "total_revenue": round(total_revenue, 2),
+        "total_profit": round(total_profit, 2),
+        "profit_margin": round(profit_margin, 2),
+        "total_orders": total_orders,
+        "total_customers": total_customers,
+        "total_items": total_items,
+        "average_ticket": round(average_ticket, 2),
+        "data_source": "PostgreSQL",
     }
