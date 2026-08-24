@@ -1,8 +1,56 @@
-import { useState } from "react";
-import { BarChart3, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useState, type FormEvent } from "react";
+import {
+  BarChart3,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+} from "lucide-react";
+
+import { api } from "../services/api";
+
 
 export default function Login() {
+  const navigate = useNavigate();
+
   const [showPassword, setShowPassword] = useState(false);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await api.post("/api/auth/login", {
+        email,
+        password,
+      });
+
+      const token = response.data.access_token;
+      const user = response.data.user;
+
+      localStorage.setItem("access_token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+
+      navigate("/dashboard");
+
+    } catch {
+      setError("E-mail ou senha inválidos.");
+
+    } finally {
+      setLoading(false);
+    }
+  }
+
 
   return (
     <main className="login-page">
@@ -35,7 +83,9 @@ export default function Login() {
       <section className="login-area">
         <div className="login-card">
           <div className="login-header">
-            <span className="login-label">PLATAFORMA ANALYTICS</span>
+            <span className="login-label">
+              PLATAFORMA ANALYTICS
+            </span>
 
             <h2>Bem-vindo de volta</h2>
 
@@ -44,7 +94,7 @@ export default function Login() {
             </p>
           </div>
 
-          <form>
+          <form onSubmit={handleSubmit}>
             <label>
               E-mail
 
@@ -54,6 +104,11 @@ export default function Login() {
                 <input
                   type="email"
                   placeholder="seu@email.com"
+                  value={email}
+                  onChange={(event) =>
+                    setEmail(event.target.value)
+                  }
+                  required
                 />
               </div>
             </label>
@@ -67,12 +122,19 @@ export default function Login() {
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="Digite sua senha"
+                  value={password}
+                  onChange={(event) =>
+                    setPassword(event.target.value)
+                  }
+                  required
                 />
 
                 <button
                   type="button"
                   className="password-button"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() =>
+                    setShowPassword(!showPassword)
+                  }
                 >
                   {showPassword ? (
                     <EyeOff size={19} />
@@ -89,13 +151,28 @@ export default function Login() {
                 Lembrar de mim
               </label>
 
-              <button type="button" className="forgot-password">
+              <button
+                type="button"
+                className="forgot-password"
+              >
                 Esqueci minha senha
               </button>
             </div>
 
-            <button type="submit" className="login-button">
-              Entrar na plataforma
+            {error && (
+              <p className="login-error">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              className="login-button"
+              disabled={loading}
+            >
+              {loading
+                ? "Entrando..."
+                : "Entrar na plataforma"}
             </button>
           </form>
 

@@ -81,3 +81,106 @@ def get_dashboard_summary():
         "average_ticket": round(average_ticket, 2),
         "data_source": "PostgreSQL",
     }
+
+def get_dashboard_charts():
+    """Retorna dados agregados para os gráficos do dashboard."""
+
+    monthly_query = text(
+        """
+        SELECT
+            TO_CHAR(
+                DATE_TRUNC('month', o.order_date),
+                'YYYY-MM'
+            ) AS month,
+            ROUND(
+                SUM(
+                    oi.quantity
+                    * oi.unit_price
+                    * (1 - oi.discount_pct)
+                ),
+                2
+            ) AS revenue
+        FROM orders o
+        JOIN order_items oi
+            ON o.order_id = oi.order_id
+        GROUP BY DATE_TRUNC('month', o.order_date)
+        ORDER BY DATE_TRUNC('month', o.order_date)
+        """
+    )
+
+    channel_query = text(
+        """
+        SELECT
+            o.sales_channel AS channel,
+            ROUND(
+                SUM(
+                    oi.quantity
+                    * oi.unit_price
+                    * (1 - oi.discount_pct)
+                ),
+                2
+            ) AS revenue
+        FROM orders o
+        JOIN order_items oi
+            ON o.order_id = oi.order_id
+        GROUP BY o.sales_channel
+        ORDER BY revenue DESC
+        """
+    )
+
+    category_query = text(
+        """
+        SELECT
+            p.category,
+            ROUND(
+                SUM(
+                    oi.quantity
+                    * oi.unit_price
+                    * (1 - oi.discount_pct)
+                ),
+                2
+            ) AS revenue
+        FROM order_items oi
+        JOIN products p
+            ON oi.product_id = p.product_id
+        GROUP BY p.category
+        ORDER BY revenue DESC
+        """
+    )
+
+    with engine.connect() as connection:
+        monthly_rows = connection.execute(
+            monthly_query
+        ).mappings().all()
+
+        channel_rows = connection.execute(
+            channel_query
+        ).mappings().all()
+
+        category_rows = connection.execute(
+            category_query
+        ).mappings().all()
+
+    return {
+        "monthly_sales": [
+            {
+                "month": row["month"],
+                "revenue": float(row["revenue"] or 0),
+            }
+            for row in monthly_rows
+        ],
+        "channel_sales": [
+            {
+                "channel": row["channel"],
+                "revenue": float(row["revenue"] or 0),
+            }
+            for row in channel_rows
+        ],
+        "category_sales": [
+            {
+                "category": row["category"],
+                "revenue": float(row["revenue"] or 0),
+            }
+            for row in category_rows
+        ],
+    }
