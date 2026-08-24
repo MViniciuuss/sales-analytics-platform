@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from backend.app.routes.data import router as data_router
 from backend.app.services.dashboard_service import (
     get_dashboard_summary,
 )
@@ -9,6 +10,8 @@ app = FastAPI(
     description="API da plataforma full stack de análise de vendas.",
     version="1.0.0",
 )
+
+app.include_router(data_router)
 
 
 @app.get("/")

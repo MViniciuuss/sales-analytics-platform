@@ -27,3 +27,11 @@ Thumbs.db
 # Generated datasets
 data/raw/*.csv
 data/processed/*.csv
+
+# Frontend / Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Vite
+*.local
